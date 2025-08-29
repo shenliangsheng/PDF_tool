@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 import base64
 import tempfile
-from streamlit_sortables import sortable_items
+from streamlit_sortables import sort_items
 import time
 
 # 设置页面配置
@@ -224,7 +224,7 @@ def main():
                 
                 # 使用sortable组件（需要安装streamlit-sortables）
                 try:
-                    sorted_items = sortable_items(file_items, direction="vertical")
+                    sorted_items = sort_items(file_items, direction="vertical")
                     if sorted_items != file_items:
                         # 更新文件顺序
                         new_order = [item['id'] for item in sorted_items]
