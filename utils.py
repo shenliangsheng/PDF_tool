@@ -2,16 +2,22 @@ import io
 import fitz  # PyMuPDF
 from PyPDF2 import PdfReader, PdfWriter
 
-def resize_pdf_bytes_to_a4(pdf_bytes: bytes) -> bytes:
-    """把整份 PDF 所有页面统一成 A4（595×842 pt）并返回新的 bytes"""
+def resize_pdf_to_a4_keep_scale(pdf_bytes: bytes) -> bytes:
+    """
+    把每页居中缩放到 A4，不旋转、不变形
+    """
     src = fitz.open("pdf", pdf_bytes)
     dst = fitz.open()
     a4_rect = fitz.paper_rect("a4")
 
     for page in src:
         new_page = dst.new_page(width=a4_rect.width, height=a4_rect.height)
-        # 保持原页面比例，居中缩放
-        new_page.show_pdf_page(new_page.rect, src, page.number)
+        # 计算缩放比例，保持原比例居中
+        src_rect = page.rect
+        zoom = min(a4_rect.width / src_rect.width,
+                   a4_rect.height / src_rect.height)
+        matrix = fitz.Matrix(zoom, zoom)
+        new_page.show_pdf_page(new_page.rect, src, page.number, matrix=matrix)
 
     out = io.BytesIO()
     dst.save(out)
@@ -20,16 +26,20 @@ def resize_pdf_bytes_to_a4(pdf_bytes: bytes) -> bytes:
     out.seek(0)
     return out.read()
 
-def merge_pdfs(file_list, resize_to_a4=False):
-    """合并若干上传文件，返回 bytes"""
+def merge_pdfs_with_adjust(file_objs, resize_a4=False, rotations=None):
+    """
+    合并 + 可选 A4 缩放 + 可选逐页旋转
+    rotations: dict {page_index: angle(90,180,270)}
+    """
     writer = PdfWriter()
-    for f in file_list:
-        data = f.read()
-        if resize_to_a4:
-            data = resize_pdf_bytes_to_a4(data)
-        reader = PdfReader(io.BytesIO(data))
-        for page in reader.pages:
-            writer.add_page(page)
+    idx = 0
+    for f in file_objs:
+        reader = PdfReader(f)
+        for p in reader.pages:
+            if rotations and idx in rotations:
+                p.rotate(rotations[idx])
+            writer.add_page(p)
+            idx += 1
 
     buf = io.BytesIO()
     writer.write(buf)
